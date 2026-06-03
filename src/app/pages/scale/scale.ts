@@ -164,4 +164,11 @@ export class Scale {
       });
     });
   }
+  mostrarNotificaciones(): void {
+  Swal.fire({
+    icon: 'info',
+    title: 'Notificaciones',
+    text: 'No hay notificaciones nuevas'
+  });
+}
 }

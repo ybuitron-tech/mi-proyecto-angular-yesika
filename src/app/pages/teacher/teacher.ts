@@ -192,6 +192,15 @@ export class Teacher implements OnInit {
       showConfirmButton: false
     });
   }
+  
+mostrarNotificaciones(): void {
+  Swal.fire({
+    icon: 'info',
+    title: 'Notificaciones',
+    text: 'No hay notificaciones nuevas'
+  });
+}
+  
   async ngOnInit(): Promise<void> {
   await this.teacherService.inicializarDatos();
   this.cargarDocentes();

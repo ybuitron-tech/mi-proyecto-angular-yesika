@@ -1,7 +1,8 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-results',
@@ -11,7 +12,10 @@ import { RouterModule } from '@angular/router';
   styleUrls: ['./results.css']
 })
 export class Results {
-  filtro: string = ''; // Nombre que usan tus compañeros
+
+  constructor(private router: Router) {}
+
+  filtro: string = '';
   estudianteSeleccionado: any = null;
 
   resultados = [
@@ -21,8 +25,8 @@ export class Results {
   ];
 
   get resultadosFiltrados() {
-    return this.resultados.filter(r => 
-      r.estudiante.toLowerCase().includes(this.filtro.toLowerCase()) || 
+    return this.resultados.filter(r =>
+      r.estudiante.toLowerCase().includes(this.filtro.toLowerCase()) ||
       r.identificacion.includes(this.filtro)
     );
   }
@@ -31,8 +35,35 @@ export class Results {
     this.estudianteSeleccionado = r;
   }
 
-  cerrarSesion() {
-    // Lógica para cerrar sesión
-    console.log('Sesión cerrada');
+  cerrarSesion(): void {
+    Swal.fire({
+      title: 'Cerrar sesión',
+      text: '¿Desea salir del sistema?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Salir',
+      cancelButtonText: 'Cancelar'
+    }).then((res) => {
+      if (!res.isConfirmed) return;
+
+      localStorage.removeItem('usuarioActivo');
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Sesión cerrada',
+        timer: 1200,
+        showConfirmButton: false
+      }).then(() => {
+        this.router.navigate(['/']);
+      });
+    });
   }
+mostrarNotificaciones(): void {
+  Swal.fire({
+    icon: 'info',
+    title: 'Notificaciones',
+    text: 'No hay notificaciones nuevas'
+  });
+}
+
 }

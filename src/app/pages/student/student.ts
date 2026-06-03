@@ -179,8 +179,35 @@ export class Student implements OnInit {
     this.indiceEdicion = null;
   }
 
+  mostrarNotificaciones(): void {
+  Swal.fire({
+    icon: 'info',
+    title: 'Notificaciones',
+    text: 'No hay notificaciones nuevas'
+  });
+}
+
   cerrarSesion(): void {
+  Swal.fire({
+    title: 'Cerrar sesión',
+    text: '¿Desea salir del sistema?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Salir',
+    cancelButtonText: 'Cancelar'
+  }).then((res) => {
+    if (!res.isConfirmed) return;
+
     localStorage.removeItem('usuarioActivo');
-    this.router.navigate(['/']);
-  }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Sesión cerrada',
+      timer: 1200,
+      showConfirmButton: false
+    }).then(() => {
+      this.router.navigate(['/']);
+    });
+  });
+}
 }

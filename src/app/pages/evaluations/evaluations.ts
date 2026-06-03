@@ -95,6 +95,15 @@ export class Evaluations implements OnInit {
       this.router.navigate(['/preguntas']);
     });
   }
+  
+mostrarNotificaciones(): void {
+  Swal.fire({
+    icon: 'info',
+    title: 'Notificaciones',
+    text: 'No hay notificaciones nuevas'
+  });
+}
+
   cerrarSesion(): void {
   Swal.fire({
     title: 'Cerrar sesión',
