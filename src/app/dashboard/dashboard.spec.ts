@@ -1,4 +1,4 @@
-import { DashboardComponent } from './dashboard';
+import { DashboardComponent } from './dashboard.component';
 
 describe('DashboardComponent', () => {
   let component: DashboardComponent;

@@ -1,0 +1,59 @@
+.dashboard {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  background: #f4f6f9;
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.btn {
+  background: #2c3e50;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 15px;
+}
+
+.btn:hover {
+  background: #1a252f;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card p {
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.green {
+  border-left: 5px solid green;
+}
+
+.red {
+  border-left: 5px solid red;
+}
+
+.ia {
+  margin-top: 20px;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}

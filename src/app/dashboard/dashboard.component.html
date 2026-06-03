@@ -1,13 +1,11 @@
 <div class="dashboard">
 
-  <h2>📊 Panel Académico</h2>
+  <h2>📊 Dashboard Inteligente</h2>
 
-  <!-- BOTÓN -->
   <button class="btn" (click)="toggleDashboard()">
-    {{ mostrar ? '🔽 Ocultar Dashboard' : '📊 Ver Dashboard' }}
+    {{ mostrar ? '🔽 Ocultar Panel' : '📊 Ver Panel' }}
   </button>
 
-  <!-- CONTENIDO DESPLEGABLE -->
   <div *ngIf="mostrar">
 
     <div class="cards">
