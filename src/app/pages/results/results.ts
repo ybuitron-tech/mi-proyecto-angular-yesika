@@ -65,5 +65,18 @@ mostrarNotificaciones(): void {
     text: 'No hay notificaciones nuevas'
   });
 }
-
+obtenerFeedbackIA(nota: number): string {
+  if (nota >= 4.5) {
+    return '🟢 Excelente desempeño 😄';
+  } 
+  else if (nota >= 3.5) {
+    return '🟡 Buen rendimiento 🙂';
+  } 
+  else if (nota >= 3.0) {
+    return '🟠 Aceptable, puede mejorar';
+  } 
+  else {
+    return '🔴 Debe reforzar conocimientos ⚠️';
+  }
+}
 }

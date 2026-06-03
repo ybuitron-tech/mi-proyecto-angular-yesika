@@ -35,6 +35,7 @@
               <th>Identificación</th>
               <th>Nota Final</th>
               <th>Estado</th>
+              <th>IA</th>
               <th>Acción</th>
             </tr>
           </thead>
@@ -48,6 +49,9 @@
                   {{ r.nota >= 3 ? 'Aprobado' : 'Reprobado' }}
                 </span>
               </td>
+
+              <td>{{ obtenerFeedbackIA(r.nota) }}</td>
+              
               <td>
                 <button class="btn-reporte" (click)="seleccionarEstudiante(r)">
                   <i class="fas fa-file-alt"></i> Centro de reportes

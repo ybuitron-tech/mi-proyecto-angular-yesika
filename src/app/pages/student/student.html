@@ -118,6 +118,7 @@
                 <th>Identificación</th>
                 <th>Correo</th>
                 <th>Nota</th>
+                <th>IA Perfil</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -128,6 +129,7 @@
                 <td>{{ est.nombre }} {{ est.apellido }}</td>
                 <td>{{ est.identificacion }}</td>
                 <td>{{ est.correo }}</td>
+                <td>{{ obtenerPerfilIA(est.nota) }}</td>
                 <td>{{ est.nota }}</td>
                 <td>
                   <span

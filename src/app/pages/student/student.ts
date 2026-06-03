@@ -210,4 +210,19 @@ export class Student implements OnInit {
     });
   });
 }
+obtenerPerfilIA(nota: number): string {
+  if (nota >= 4.5) {
+    return '🏆 Estudiante destacado';
+  } 
+  else if (nota >= 3.5) {
+    return '👍 Buen estudiante';
+  } 
+  else if (nota >= 3) {
+    return '🟡 Estudiante en proceso de mejora';
+  } 
+  else {
+    return '⚠️ Requiere acompañamiento';
+  }
+}
+
 }

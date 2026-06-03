@@ -8,9 +8,10 @@ import { Questions } from './pages/questions/questions';
 import { Results } from './pages/results/results';
 import { Scale } from './pages/scale/scale';
 import { Exam } from './pages/exam/exam';
-
+import { DashboardComponent } from './dashboard/dashboard';
 
 export const routes: Routes = [
+
    { path: '', component: Login },
    { path: 'registro', component: Register },
    { path: 'estudiantes', component: Student },
@@ -20,4 +21,5 @@ export const routes: Routes = [
    { path: 'resultados', component:Results},
    { path: 'escalas', component:Scale},
    { path: 'examen', component: Exam },
+   { path: 'dashboard', component: DashboardComponent }
 ]
