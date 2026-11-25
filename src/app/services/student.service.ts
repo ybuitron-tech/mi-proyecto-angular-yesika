@@ -27,8 +27,11 @@ export class StudentService {
   }
 
   async existeIdentificacion(identificacion: string): Promise<boolean> {
-    await this.cargar();
-    return this.lista.some(est => est.identificacion === identificacion);
+    return firstValueFrom(
+      this.http.get<boolean>(
+        `${this.apiUrl}/existe/${encodeURIComponent(identificacion)}`
+      )
+    );
   }
 
   async registrar(estudiante: StudentModel): Promise<StudentModel> {
