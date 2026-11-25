@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { TeacherModel } from '../models/teacher';
 
 @Injectable({
@@ -8,73 +9,67 @@ import { TeacherModel } from '../models/teacher';
 })
 export class TeacherService {
 
-  private KEY = 'docentes';
+  private readonly apiUrl = `${environment.apiUrl}/profesores`;
+  private lista: TeacherModel[] = [];
 
   constructor(private http: HttpClient) {}
 
-  
-  async inicializarDatos() {
-    const datos = localStorage.getItem(this.KEY);
-    const lista: TeacherModel[] = JSON.parse(datos || '[]');
-
-    if (lista.length === 0) {
-      try {
-        const datosJSON = await firstValueFrom(
-          this.http.get<TeacherModel[]>('assets/docentes.json')
-        );
-
-        localStorage.setItem(this.KEY, JSON.stringify(datosJSON));
-        console.log('Datos cargados desde JSON');
-      } catch (error) {
-        console.error('Error cargando JSON', error);
-      }
-    }
+  async inicializarDatos(): Promise<TeacherModel[]> {
+    return this.cargar();
   }
 
-  
+  async cargar(): Promise<TeacherModel[]> {
+    this.lista = await firstValueFrom(
+      this.http.get<TeacherModel[]>(this.apiUrl)
+    );
+    return this.lista;
+  }
+
   getDocentes(): TeacherModel[] {
-    return JSON.parse(localStorage.getItem(this.KEY) || '[]');
+    return this.lista;
   }
 
-  
-  guardarDocentes(lista: TeacherModel[]) {
-    localStorage.setItem(this.KEY, JSON.stringify(lista));
+  async existeIdentificacion(identificacion: string): Promise<boolean> {
+    await this.cargar();
+    return this.lista.some(d => d.identificacion === identificacion);
   }
 
-  
-  agregar(docente: TeacherModel) {
-    const lista = this.getDocentes();
-    lista.push(docente);
-    this.guardarDocentes(lista);
+  async agregar(docente: TeacherModel): Promise<TeacherModel> {
+    const creado = await firstValueFrom(
+      this.http.post<TeacherModel>(this.apiUrl, this.limpiar(docente))
+    );
+    await this.cargar();
+    return creado;
   }
 
-  
-  actualizar(index: number, docente: TeacherModel) {
-    const lista = this.getDocentes();
-    if (lista[index]) {
-      lista[index] = docente;
-      this.guardarDocentes(lista);
-    }
+  async actualizar(id: number, docente: TeacherModel): Promise<TeacherModel> {
+    const actualizado = await firstValueFrom(
+      this.http.patch<TeacherModel>(`${this.apiUrl}/${id}`, this.limpiar(docente))
+    );
+    await this.cargar();
+    return actualizado;
   }
 
-  
-  eliminar(index: number) {
-    const lista = this.getDocentes();
-    lista.splice(index, 1);
-    this.guardarDocentes(lista);
+  async eliminar(id: number): Promise<void> {
+    await firstValueFrom(this.http.delete(`${this.apiUrl}/${id}`));
+    await this.cargar();
   }
 
-  
-  existeIdentificacion(identificacion: string): boolean {
-    return this.getDocentes().some(
-      d => d.identificacion === identificacion
+  async login(identificacion: string, password: string): Promise<TeacherModel> {
+    return firstValueFrom(
+      this.http.post<TeacherModel>(`${this.apiUrl}/login`, { identificacion, password })
     );
   }
 
-  
-  buscarPorIdentificacion(identificacion: string): TeacherModel | undefined {
-    return this.getDocentes().find(
-      d => d.identificacion === identificacion
-    );
+  private limpiar(docente: TeacherModel) {
+    const payload: any = {
+      nombre: docente.nombre,
+      identificacion: docente.identificacion,
+      correo: docente.correo,
+      titulo: docente.titulo,
+      estado: docente.estado
+    };
+    if (docente.password) payload.password = docente.password;
+    return payload;
   }
 }

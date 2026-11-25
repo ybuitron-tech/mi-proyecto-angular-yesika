@@ -129,8 +129,8 @@
                 <td>{{ est.nombre }} {{ est.apellido }}</td>
                 <td>{{ est.identificacion }}</td>
                 <td>{{ est.correo }}</td>
-                <td>{{ obtenerPerfilIA(est.nota) }}</td>
-                <td>{{ est.nota }}</td>
+                <td>{{ est.nota ?? 0 }}</td>
+                <td>{{ obtenerPerfilIA(est.nota ?? 0) }}</td>
                 <td>
                   <span
                     class="estado-badge"

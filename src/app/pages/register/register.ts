@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import Swal from 'sweetalert2';
 
+import { StudentService } from '../../services/student.service';
+import { StudentModel } from '../../models/student';
+
 @Component({
   selector: 'app-register',
   standalone: true,
@@ -13,7 +16,7 @@ import Swal from 'sweetalert2';
 })
 export class Register {
 
-  estudiante = {
+  estudiante: StudentModel = {
     nombre: '',
     apellido: '',
     identificacion: '',
@@ -22,9 +25,12 @@ export class Register {
     estado: 'activo'
   };
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private studentService: StudentService
+  ) {}
 
-  registrarEstudiante() {
+  async registrarEstudiante(): Promise<void> {
     const e = this.estudiante;
 
     const reglas = [
@@ -52,33 +58,35 @@ export class Register {
       return;
     }
 
-    const lista = JSON.parse(localStorage.getItem('estudiantes') || '[]');
+    try {
+      if (await this.studentService.existeIdentificacion(e.identificacion)) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Ya existe un estudiante con esa identificación'
+        });
+        return;
+      }
 
-    const existe = lista.some((est: any) =>
-      est.identificacion === e.identificacion
-    );
+      await this.studentService.registrar(this.estudiante);
 
-    if (existe) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Registro exitoso',
+        text: 'Ahora puedes iniciar sesión'
+      }).then(() => {
+        this.router.navigate(['/']);
+      });
+
+      this.limpiarFormulario();
+    } catch (error: any) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Ya existe un estudiante con esa identificación'
+        text: error?.error?.message || 'No se pudo registrar. Verifica el backend.'
       });
-      return;
+      console.error(error);
     }
-
-    lista.push({ ...this.estudiante });
-    localStorage.setItem('estudiantes', JSON.stringify(lista));
-
-    Swal.fire({
-      icon: 'success',
-      title: 'Registro exitoso',
-      text: 'Ahora puedes iniciar sesión'
-    }).then(() => {
-      this.router.navigate(['/login']);
-    });
-
-    this.limpiarFormulario();
   }
 
   limpiarFormulario() {

@@ -28,18 +28,31 @@ export class Teacher implements OnInit {
   listaDocentes: TeacherModel[] = [];
 
   editando = false;
-  indiceEdicion: number | null = null;
+  idEdicion: number | null = null;
+  cargando = false;
 
   constructor(
-  private router: Router,
-  private teacherService: TeacherService
-) {}
+    private router: Router,
+    private teacherService: TeacherService
+  ) {}
 
-  cargarDocentes() {
-    this.listaDocentes = this.teacherService.getDocentes();
+  async ngOnInit(): Promise<void> {
+    await this.cargarDocentes();
   }
 
-  validarFormulario(): string[] {
+  async cargarDocentes(): Promise<void> {
+    this.cargando = true;
+    try {
+      this.listaDocentes = await this.teacherService.cargar();
+    } catch (error) {
+      this.mostrarError('No se pudo conectar con el backend. Verifica que esté encendido.');
+      console.error(error);
+    } finally {
+      this.cargando = false;
+    }
+  }
+
+  async validarFormulario(): Promise<string[]> {
     const d = this.docente;
 
     const reglas = [
@@ -52,76 +65,90 @@ export class Teacher implements OnInit {
       () => !d.correo && 'Correo obligatorio',
       () => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.correo) && 'Correo inválido',
 
-      () => !d.password && 'Contraseña obligatoria',
-      () => d.password.length < 6 && 'Mínimo 6 caracteres',
-
-      () =>
-        !this.editando &&
-        this.teacherService.existeIdentificacion(d.identificacion) &&
-        'Ya existe un docente con esa identificación'
+      () => !this.editando && !d.password && 'Contraseña obligatoria',
+      () => !this.editando && d.password.length < 6 && 'Mínimo 6 caracteres'
     ];
 
-    return reglas
+    const errores = reglas
       .map(r => r())
       .filter(m => m) as string[];
+
+    if (!this.editando && await this.teacherService.existeIdentificacion(d.identificacion)) {
+      errores.push('Ya existe un docente con esa identificación');
+    }
+
+    return errores;
   }
 
-  guardarDocente() {
-    const errores = this.validarFormulario();
+  async guardarDocente(): Promise<void> {
+    try {
+      const errores = await this.validarFormulario();
 
-    if (errores.length) {
-      this.mostrarError(errores.join('\n'));
-      return;
-    }
+      if (errores.length) {
+        this.mostrarError(errores.join('\n'));
+        return;
+      }
 
-    if (this.editando) {
-      this.teacherService.actualizar(this.indiceEdicion!, this.docente);
-    } else {
-      this.teacherService.agregar(this.docente);
-    }
+      if (this.editando && this.idEdicion !== null) {
+        await this.teacherService.actualizar(this.idEdicion, this.docente);
+      } else {
+        await this.teacherService.agregar(this.docente);
+      }
 
-    this.cargarDocentes();
-    this.limpiarFormulario();
-
-    this.mostrarExito(
-      this.editando
+      await this.cargarDocentes();
+      const mensaje = this.editando
         ? 'Docente actualizado correctamente'
-        : 'Docente guardado correctamente'
-    );
+        : 'Docente guardado correctamente';
+      this.limpiarFormulario();
+      await this.mostrarExito(mensaje);
+    } catch (error) {
+      this.mostrarError(this.mensajeBackend(error));
+      console.error(error);
+    }
   }
 
-  editarDocente(index: number) {
-    this.docente = { ...this.listaDocentes[index] };
+  editarDocente(index: number): void {
+    const docente = this.listaDocentes[index];
+    if (!docente?.id) return;
+
+    this.docente = { ...docente, password: '' };
     this.editando = true;
-    this.indiceEdicion = index;
+    this.idEdicion = docente.id;
 
     this.mostrarInfo(`Editando a ${this.docente.nombre}`);
   }
 
-  eliminarDocente(index: number) {
+  async eliminarDocente(index: number): Promise<void> {
+    const docente = this.listaDocentes[index];
+    if (!docente?.id) return;
+
     Swal.fire({
       title: '¿Eliminar docente?',
-      text: `Se eliminará a ${this.listaDocentes[index].nombre}`,
+      text: `Se eliminará a ${docente.nombre}`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar'
-    }).then(res => {
+    }).then(async res => {
       if (!res.isConfirmed) return;
 
-      this.teacherService.eliminar(index);
+      try {
+        await this.teacherService.eliminar(docente.id!);
+        await this.cargarDocentes();
 
-      this.cargarDocentes();
+        if (this.editando && this.idEdicion === docente.id) {
+          this.limpiarFormulario();
+        }
 
-      if (this.editando && this.indiceEdicion === index) {
-        this.limpiarFormulario();
+        await this.mostrarExito('Docente eliminado correctamente');
+      } catch (error) {
+        this.mostrarError(this.mensajeBackend(error));
+        console.error(error);
       }
-
-      this.mostrarExito('Docente eliminado correctamente');
     });
   }
 
-  cancelar() {
+  cancelar(): void {
     if (!this.editando) return this.limpiarFormulario();
 
     Swal.fire({
@@ -136,7 +163,7 @@ export class Teacher implements OnInit {
     });
   }
 
-  limpiarFormulario() {
+  limpiarFormulario(): void {
     this.docente = {
       nombre: '',
       identificacion: '',
@@ -147,10 +174,10 @@ export class Teacher implements OnInit {
     };
 
     this.editando = false;
-    this.indiceEdicion = null;
+    this.idEdicion = null;
   }
 
-  cerrarSesion() {
+  cerrarSesion(): void {
     Swal.fire({
       title: 'Cerrar sesión',
       text: '¿Desea salir del sistema?',
@@ -192,17 +219,16 @@ export class Teacher implements OnInit {
       showConfirmButton: false
     });
   }
-  
-mostrarNotificaciones(): void {
-  Swal.fire({
-    icon: 'info',
-    title: 'Notificaciones',
-    text: 'No hay notificaciones nuevas'
-  });
-}
-  
-  async ngOnInit(): Promise<void> {
-  await this.teacherService.inicializarDatos();
-  this.cargarDocentes();
-}
+
+  mostrarNotificaciones(): void {
+    Swal.fire({
+      icon: 'info',
+      title: 'Notificaciones',
+      text: 'No hay notificaciones nuevas'
+    });
+  }
+
+  private mensajeBackend(error: any): string {
+    return error?.error?.message || 'No se pudo completar la operación. Intenta de nuevo.';
+  }
 }

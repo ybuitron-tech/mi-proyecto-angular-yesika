@@ -16,7 +16,7 @@ import { StudentModel } from '../../models/student';
 })
 export class Student implements OnInit {
 
-  estudiante: any = {
+  estudiante: StudentModel = {
     nombre: '',
     apellido: '',
     identificacion: '',
@@ -27,25 +27,34 @@ export class Student implements OnInit {
     estadoResultado: 'pendiente'
   };
 
-  listaEstudiantes: any[] = [];
+  listaEstudiantes: StudentModel[] = [];
   filtro: string = '';
   editando: boolean = false;
-  indiceEdicion: number | null = null;
+  idEdicion: number | null = null;
+  cargando: boolean = false;
 
   constructor(
     private router: Router,
     private studentService: StudentService
   ) {}
 
-  ngOnInit(): void {
-    this.cargarEstudiantes();
+  async ngOnInit(): Promise<void> {
+    await this.cargarEstudiantes();
   }
 
-  cargarEstudiantes(): void {
-    this.listaEstudiantes = this.studentService.getEstudiantes();
+  async cargarEstudiantes(): Promise<void> {
+    this.cargando = true;
+    try {
+      this.listaEstudiantes = await this.studentService.cargar();
+    } catch (error) {
+      this.mostrarError('No se pudo conectar con el backend. Verifica que esté encendido.');
+      console.error(error);
+    } finally {
+      this.cargando = false;
+    }
   }
 
-  get estudiantesFiltrados(): any[] {
+  get estudiantesFiltrados(): StudentModel[] {
     return this.listaEstudiantes.filter(est =>
       `${est.nombre} ${est.apellido}`.toLowerCase().includes(this.filtro.toLowerCase()) ||
       est.identificacion.toLowerCase().includes(this.filtro.toLowerCase()) ||
@@ -53,7 +62,7 @@ export class Student implements OnInit {
     );
   }
 
-  guardarEstudiante(): void {
+  async guardarEstudiante(): Promise<void> {
     const e = this.estudiante;
 
     const reglas = [
@@ -73,70 +82,44 @@ export class Student implements OnInit {
       .filter(m => m) as string[];
 
     if (errores.length) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: errores.join(', ')
-      });
+      this.mostrarError(errores.join(', '));
       return;
     }
 
-    if (!this.editando && this.studentService.existeIdentificacion(e.identificacion)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Ya existe un estudiante con esa identificación'
-      });
-      return;
+    try {
+      if (!this.editando && await this.studentService.existeIdentificacion(e.identificacion)) {
+        this.mostrarError('Ya existe un estudiante con esa identificación');
+        return;
+      }
+
+      if (this.editando && this.idEdicion !== null) {
+        await this.studentService.actualizar(this.idEdicion, this.estudiante);
+        await this.mostrarExito('Estudiante actualizado');
+      } else {
+        await this.studentService.registrar(this.estudiante);
+        await this.mostrarExito('Estudiante registrado');
+      }
+
+      await this.cargarEstudiantes();
+      this.limpiarFormulario();
+    } catch (error) {
+      this.mostrarError(this.mensajeBackend(error));
+      console.error(error);
     }
-
-    if (this.editando && this.indiceEdicion !== null) {
-      this.studentService.actualizar(this.indiceEdicion, this.estudiante);
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Estudiante actualizado',
-        timer: 1200,
-        showConfirmButton: false
-      });
-
-    } else {
-      this.studentService.registrar(this.estudiante);
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Estudiante registrado',
-        timer: 1200,
-        showConfirmButton: false
-      });
-    }
-
-    this.cargarEstudiantes();
-    this.limpiarFormulario();
   }
 
   editarEstudiante(index: number): void {
     const est = this.estudiantesFiltrados[index];
+    if (!est?.id) return;
 
-    const indexReal = this.listaEstudiantes.findIndex(
-      e => e.identificacion === est.identificacion
-    );
-
-    if (indexReal === -1) return;
-
-    this.estudiante = { ...this.listaEstudiantes[indexReal] };
+    this.estudiante = { ...est, password: '' };
     this.editando = true;
-    this.indiceEdicion = indexReal;
+    this.idEdicion = est.id;
   }
 
-  eliminarEstudiante(index: number): void {
+  async eliminarEstudiante(index: number): Promise<void> {
     const est = this.estudiantesFiltrados[index];
-
-    const indexReal = this.listaEstudiantes.findIndex(
-      e => e.identificacion === est.identificacion
-    );
-
-    if (indexReal === -1) return;
+    if (!est?.id) return;
 
     Swal.fire({
       title: '¿Eliminar estudiante?',
@@ -144,18 +127,18 @@ export class Student implements OnInit {
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar'
-    }).then(res => {
+    }).then(async res => {
       if (!res.isConfirmed) return;
 
-      this.studentService.eliminar(indexReal);
-      this.cargarEstudiantes();
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Eliminado',
-        timer: 1200,
-        showConfirmButton: false
-      });
+      try {
+        await this.studentService.eliminar(est.id!);
+        await this.cargarEstudiantes();
+        if (this.idEdicion === est.id) this.limpiarFormulario();
+        await this.mostrarExito('Eliminado');
+      } catch (error) {
+        this.mostrarError(this.mensajeBackend(error));
+        console.error(error);
+      }
     });
   }
 
@@ -176,53 +159,70 @@ export class Student implements OnInit {
     };
 
     this.editando = false;
-    this.indiceEdicion = null;
+    this.idEdicion = null;
   }
 
   mostrarNotificaciones(): void {
-  Swal.fire({
-    icon: 'info',
-    title: 'Notificaciones',
-    text: 'No hay notificaciones nuevas'
-  });
-}
+    Swal.fire({
+      icon: 'info',
+      title: 'Notificaciones',
+      text: 'No hay notificaciones nuevas'
+    });
+  }
 
   cerrarSesion(): void {
-  Swal.fire({
-    title: 'Cerrar sesión',
-    text: '¿Desea salir del sistema?',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Salir',
-    cancelButtonText: 'Cancelar'
-  }).then((res) => {
-    if (!res.isConfirmed) return;
-
-    localStorage.removeItem('usuarioActivo');
-
     Swal.fire({
+      title: 'Cerrar sesión',
+      text: '¿Desea salir del sistema?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Salir',
+      cancelButtonText: 'Cancelar'
+    }).then((res) => {
+      if (!res.isConfirmed) return;
+
+      localStorage.removeItem('usuarioActivo');
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Sesión cerrada',
+        timer: 1200,
+        showConfirmButton: false
+      }).then(() => {
+        this.router.navigate(['/']);
+      });
+    });
+  }
+
+  obtenerPerfilIA(nota: number): string {
+    if (nota >= 4.5) {
+      return '🏆 Estudiante destacado';
+    }
+    else if (nota >= 3.5) {
+      return '👍 Buen estudiante';
+    }
+    else if (nota >= 3) {
+      return '🟡 Estudiante en proceso de mejora';
+    }
+    else {
+      return '⚠️ Requiere acompañamiento';
+    }
+  }
+
+  private mostrarError(mensaje: string) {
+    Swal.fire({ icon: 'error', title: 'Error', text: mensaje });
+  }
+
+  private mostrarExito(mensaje: string) {
+    return Swal.fire({
       icon: 'success',
-      title: 'Sesión cerrada',
+      title: mensaje,
       timer: 1200,
       showConfirmButton: false
-    }).then(() => {
-      this.router.navigate(['/']);
     });
-  });
-}
-obtenerPerfilIA(nota: number): string {
-  if (nota >= 4.5) {
-    return '🏆 Estudiante destacado';
-  } 
-  else if (nota >= 3.5) {
-    return '👍 Buen estudiante';
-  } 
-  else if (nota >= 3) {
-    return '🟡 Estudiante en proceso de mejora';
-  } 
-  else {
-    return '⚠️ Requiere acompañamiento';
   }
-}
 
+  private mensajeBackend(error: any): string {
+    return error?.error?.message || 'No se pudo completar la operación. Intenta de nuevo.';
+  }
 }

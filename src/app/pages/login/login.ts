@@ -4,6 +4,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import Swal from 'sweetalert2';
 
+import { StudentService } from '../../services/student.service';
+import { TeacherService } from '../../services/teacher.service';
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -16,11 +19,15 @@ export class Login {
   identificacion: string = '';
   password: string = '';
   rol: string = '';
+  cargando = false;
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private studentService: StudentService,
+    private teacherService: TeacherService
+  ) {}
 
-  iniciarSesion() {
-
+  async iniciarSesion(): Promise<void> {
     if (!this.identificacion || !this.password || !this.rol) {
       Swal.fire({
         icon: 'error',
@@ -30,58 +37,47 @@ export class Login {
       return;
     }
 
-    // LOGIN DOCENTE
-    if (this.rol === 'docente') {
-      const docentes = JSON.parse(localStorage.getItem('docentes') || '[]');
+    this.cargando = true;
 
-      const docente = docentes.find((d: any) =>
-        d.identificacion === this.identificacion &&
-        d.password === this.password
-      );
+    try {
+      if (this.rol === 'docente') {
+        const docente = await this.teacherService.login(this.identificacion, this.password);
 
-      if (!docente) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Docente no encontrado o contraseña incorrecta'
-        });
+        localStorage.setItem('usuarioActivo', JSON.stringify({
+          tipo: 'docente',
+          data: docente
+        }));
+
+        await this.router.navigate(['/docentes']);
         return;
       }
 
-      localStorage.setItem('usuarioActivo', JSON.stringify({
-        tipo: 'docente',
-        data: docente
-      }));
+      if (this.rol === 'estudiante') {
+        const estudiante = await this.studentService.login(this.identificacion, this.password);
 
-      this.router.navigate(['/docentes']);
-      return;
-    }
+        localStorage.setItem('usuarioActivo', JSON.stringify({
+          tipo: 'estudiante',
+          data: estudiante
+        }));
 
-    // LOGIN ESTUDIANTE
-    if (this.rol === 'estudiante') {
-      const estudiantes = JSON.parse(localStorage.getItem('estudiantes') || '[]');
-
-      const estudiante = estudiantes.find((e: any) =>
-        e.identificacion === this.identificacion &&
-        e.password === this.password
-      );
-
-      if (!estudiante) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Estudiante no encontrado o contraseña incorrecta'
-        });
+        await this.router.navigate(['/examen']);
         return;
       }
 
-      localStorage.setItem('usuarioActivo', JSON.stringify({
-        tipo: 'estudiante',
-        data: estudiante
-      }));
-
-      this.router.navigate(['/examen']);
-      return;
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Rol no válido'
+      });
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error?.error?.message || 'No se pudo iniciar sesión. Verifica el backend.'
+      });
+      console.error(error);
+    } finally {
+      this.cargando = false;
     }
   }
 
