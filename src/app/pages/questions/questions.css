@@ -146,12 +146,12 @@
 }
 
 .guardar {
-  background: #2ecc71;
+  background: #187c43;
   color: white;
 }
 
 .guardar:hover {
-  background: #27ae60;
+  background: #146c39;
   transform: scale(1.04);
 }
 
@@ -232,7 +232,7 @@
   padding: 40px;
   background: white;
   border-radius: 10px;
-  color: #999;
+  color: #666;
   border: 2px dashed #ddd;
 }
 
@@ -278,4 +278,54 @@
 
 .fa-eye:hover {
   color: #3498db;
+}
+.mensaje-completo {
+  margin-top: 12px;
+  background: #d4edda;
+  color: #155724;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.acciones-finalizar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.finalizar {
+  background: #1c2d4f;
+  color: white;
+}
+
+.finalizar:hover {
+  background: #152240;
+  transform: scale(1.04);
+}
+
+.boton:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+input[type="number"].entrada {
+  font-weight: 600;
+}
+.opcion-tiempo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f4f6fb;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  color: #1c2d4f;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.opcion-tiempo input {
+  transform: scale(1.1);
 }

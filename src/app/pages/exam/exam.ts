@@ -1,8 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, HostListener, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import Swal from 'sweetalert2';
+
+import { EvaluationService } from '../../services/evaluations.service';
+import { StudentService } from '../../services/student.service';
+import { AuthService } from '../../services/auth.service';
+import { EvaluationModel } from '../../models/evaluation';
 
 @Component({
   selector: 'app-exam',
@@ -11,161 +16,379 @@ import Swal from 'sweetalert2';
   templateUrl: './exam.html',
   styleUrls: ['./exam.css']
 })
-export class Exam {
+export class Exam implements OnDestroy {
 
-  evaluacion: any = null;
+  evaluacion: EvaluationModel | null = null;
   estudiante: any = null;
   respuestas: any[] = [];
-  evaluacionesDisponibles: any[] = [];
+  evaluacionesDisponibles: EvaluationModel[] = [];
   nombreUsuario: string = '';
 
-  constructor(private router: Router) {
-    this.cargarExamen();
+  evaluacionBloqueada: boolean = false;
+  preguntaActual: number = 0;
+
+  tiempoRestante = signal<number | null>(null);
+  temporizador: any = null;
+
+  constructor(
+    private router: Router,
+    private evaluationService: EvaluationService,
+    private studentService: StudentService,
+    private authService: AuthService
+  ) {
+    void this.cargarExamen();
   }
 
-  cargarExamen(): void {
-    const dataUsuario = localStorage.getItem('usuarioActivo');
+  ngOnDestroy(): void {
+    this.detenerTemporizador();
+  }
 
-    if (!dataUsuario) {
+  async cargarExamen(): Promise<void> {
+    this.detenerTemporizador();
+
+    const sesion = this.authService.obtenerSesion();
+    if (!sesion) {
       Swal.fire({
         icon: 'error',
         title: 'No hay sesión activa',
         text: 'Debe iniciar sesión'
       }).then(() => {
-        this.router.navigate(['/']);
+        void this.router.navigate(['/']);
       });
       return;
     }
 
-    this.estudiante = JSON.parse(dataUsuario);
-
+    this.estudiante = sesion;
     this.nombreUsuario =
-      this.estudiante?.nombre ||
-      this.estudiante?.data?.nombre ||
-      this.estudiante?.usuario?.nombre ||
+      sesion.data?.nombre ||
+      sesion.data?.data?.nombre ||
       'Usuario';
 
-    const listaEvaluaciones = JSON.parse(localStorage.getItem('evaluaciones') || '[]');
-    this.evaluacionesDisponibles = listaEvaluaciones.filter(
-      (e: any) => e.preguntas && e.preguntas.length > 0
+    await this.evaluationService.inicializarEvaluacion();
+
+    this.evaluacionesDisponibles = this.evaluationService.getEvaluaciones().filter(
+      (e: EvaluationModel) => (e.preguntas || []).length > 0
     );
 
-    const dataEvaluacion = localStorage.getItem('evaluacionActiva');
+    localStorage.removeItem('evaluacionActiva');
 
-    if (dataEvaluacion) {
-      this.evaluacion = JSON.parse(dataEvaluacion);
-
-      if (!this.evaluacion.preguntas || this.evaluacion.preguntas.length === 0) {
-        this.evaluacion = null;
-        return;
-      }
-
-      this.respuestas = new Array(this.evaluacion.preguntas.length).fill('');
-    }
+    this.evaluacion = null;
+    this.respuestas = [];
+    this.preguntaActual = 0;
+    this.tiempoRestante.set(null);
+    this.evaluacionBloqueada = false;
   }
 
-  seleccionarEvaluacion(evaluacion: any): void {
+  seleccionarEvaluacion(evaluacion: EvaluationModel): void {
+    if (this.yaPresentoEvaluacion(evaluacion)) return;
+
+    this.detenerTemporizador();
+
     this.evaluacion = evaluacion;
-    localStorage.setItem('evaluacionActiva', JSON.stringify(evaluacion));
+    this.evaluacionBloqueada = false;
+    this.preguntaActual = 0;
+    this.tiempoRestante.set(null);
+
+    this.evaluationService.setEvaluacionActiva(evaluacion);
     this.respuestas = new Array(this.evaluacion.preguntas.length).fill('');
+
+    this.iniciarTemporizador();
   }
 
   responder(index: number, valor: any): void {
     this.respuestas[index] = valor;
   }
 
-  finalizarExamen(): void {
+  iniciarTemporizador(): void {
+    this.detenerTemporizador();
     if (!this.evaluacion) return;
 
-    const sinResponder = this.respuestas.some(r => String(r).trim() === '');
+    const pregunta = this.evaluacion.preguntas[this.preguntaActual];
+    const tiempo = Number(pregunta?.tiempo);
 
-    if (sinResponder) {
+    if (!tiempo || tiempo <= 0) {
+      this.tiempoRestante.set(null);
+      return;
+    }
+
+    this.tiempoRestante.set(tiempo);
+
+    this.temporizador = setInterval(() => {
+      const tiempoActual = this.tiempoRestante();
+      if (tiempoActual === null) return;
+
+      const nuevoTiempo = tiempoActual - 1;
+      this.tiempoRestante.set(nuevoTiempo);
+
+      if (nuevoTiempo <= 0) this.tiempoAgotado();
+    }, 1000);
+  }
+
+  detenerTemporizador(): void {
+    if (this.temporizador) {
+      clearInterval(this.temporizador);
+      this.temporizador = null;
+    }
+  }
+
+  tiempoAgotado(): void {
+    this.detenerTemporizador();
+
+    if (!String(this.respuestas[this.preguntaActual] || '').trim()) {
+      this.respuestas[this.preguntaActual] = 'SIN_RESPONDER';
+    }
+
+    Swal.fire({
+      icon: 'warning',
+      title: 'Tiempo agotado',
+      text: 'Se terminó el tiempo para esta pregunta.',
+      timer: 1200,
+      showConfirmButton: false
+    }).then(() => {
+      this.siguientePregunta(true);
+    });
+  }
+
+  siguientePregunta(porTiempo: boolean = false): void {
+    if (!this.evaluacion) return;
+
+    if (!porTiempo && !String(this.respuestas[this.preguntaActual] || '').trim()) {
       Swal.fire({
         icon: 'warning',
-        title: 'Faltan respuestas',
-        text: 'Debes responder todas las preguntas'
+        title: 'Respuesta requerida',
+        text: 'Debe responder esta pregunta antes de continuar.'
       });
       return;
     }
 
+    if (this.preguntaActual < this.evaluacion.preguntas.length - 1) {
+      this.preguntaActual++;
+      this.iniciarTemporizador();
+      return;
+    }
+
+    void this.finalizarExamen(true);
+  }
+
+  @HostListener('document:visibilitychange')
+  detectarCambioDePestana(): void {
+    if (!this.evaluacion || this.evaluacionBloqueada) return;
+    if (document.hidden) {
+      this.evaluacionBloqueada = true;
+      void this.anularEvaluacionPorCambioDePestana();
+    }
+  }
+
+  async anularEvaluacionPorCambioDePestana(): Promise<void> {
+    this.detenerTemporizador();
+
+    const total = this.evaluacion?.preguntas?.length || 0;
+
+    const resultado = {
+      estudiante: this.nombreUsuario,
+      identificacion: this.estudiante?.data?.identificacion || '',
+      evaluacion: this.evaluacion?.nombre || '',
+      docente: this.evaluacion?.docente || '',
+      totalPreguntas: total,
+      correctas: 0,
+      nota: 0,
+      estado: 'Anulado por cambio de pestaña',
+      fecha: new Date().toLocaleString()
+    };
+
+    this.guardarEnHistorial(resultado);
+    await this.guardarNotaEnAPI(0, 'reprobado');
+
+    localStorage.removeItem('evaluacionActiva');
+
+    this.evaluacion = null;
+    this.respuestas = [];
+    this.preguntaActual = 0;
+    this.tiempoRestante.set(null);
+
+    Swal.fire({
+      icon: 'warning',
+      title: 'Evaluación anulada',
+      text: 'Cambiaste de pestaña durante la evaluación. La evaluación fue cerrada.',
+      confirmButtonText: 'Aceptar'
+    }).then(() => {
+      void this.cargarExamen();
+    });
+  }
+
+  async finalizarExamen(automatico: boolean = false): Promise<void> {
+    if (!this.evaluacion) return;
+
+    if (!automatico) {
+      const sinResponder = this.respuestas.some(r => String(r).trim() === '');
+      if (sinResponder) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Faltan respuestas',
+          text: 'Debes responder todas las preguntas'
+        });
+        return;
+      }
+    }
+
+    this.detenerTemporizador();
+
     let correctas = 0;
-
     this.evaluacion.preguntas.forEach((pregunta: any, i: number) => {
-      const correcta = String(pregunta.respuesta).trim().toUpperCase();
-      const respondida = String(this.respuestas[i]).trim().toUpperCase();
-
-      if (correcta === respondida) {
+      if (this.normalizar(pregunta.respuesta) === this.normalizar(this.respuestas[i])) {
         correctas++;
       }
     });
 
-    const total = this.evaluacion.preguntas.length;
-
-    let notaMaxima = 5;
-    if (this.evaluacion.escala) {
-      const partes = String(this.evaluacion.escala).split('-');
-      if (partes.length > 1) {
-        notaMaxima = Number(partes[1].trim()) || 5;
-      }
-    }
-
-    const nota = (correctas / total) * notaMaxima;
+    const total = this.evaluacion.preguntas.length || 1;
+    const notaMaxima = this.obtenerNotaMaxima(this.evaluacion.escala);
+    const nota = Number(((correctas / total) * notaMaxima).toFixed(2));
+    const aprobado = nota >= 3;
 
     const resultado = {
       estudiante: this.nombreUsuario,
-      identificacion:
-        this.estudiante?.identificacion ||
-        this.estudiante?.data?.identificacion ||
-        '',
+      identificacion: this.estudiante?.data?.identificacion || '',
       evaluacion: this.evaluacion.nombre,
       docente: this.evaluacion.docente,
       totalPreguntas: total,
       correctas: correctas,
-      nota: nota.toFixed(2),
+      nota,
+      estado: aprobado ? 'Aprobado' : 'Reprobado',
       fecha: new Date().toLocaleString()
     };
 
-    const historial = JSON.parse(localStorage.getItem('resultados') || '[]');
-    historial.push(resultado);
-    localStorage.setItem('resultados', JSON.stringify(historial));
+    this.guardarEnHistorial(resultado);
+    await this.guardarNotaEnAPI(nota, aprobado ? 'aprobado' : 'reprobado');
+
+    this.evaluacionBloqueada = true;
 
     Swal.fire({
-  icon: 'success',
-  title: 'Examen finalizado',
-  html: `
-    <p>Has completado la evaluación correctamente.</p>
-    <p><strong>Tu nota fue:</strong> ${nota.toFixed(2)}</p>
-  `,
-  confirmButtonText: 'Aceptar'
-}).then(() => {
-  localStorage.removeItem('evaluacionActiva');
-  this.evaluacion = null;
-  this.respuestas = [];
-  this.cargarExamen();
-});
+      icon: 'success',
+      title: automatico ? 'Examen finalizado automáticamente' : 'Examen finalizado',
+      html: `
+        <p>Has completado la evaluación correctamente.</p>
+        <p><strong>Tu nota fue:</strong> ${nota.toFixed(2)}</p>
+      `,
+      confirmButtonText: 'Aceptar'
+    }).then(() => {
+      localStorage.removeItem('evaluacionActiva');
+
+      this.evaluacion = null;
+      this.respuestas = [];
+      this.preguntaActual = 0;
+      this.tiempoRestante.set(null);
+
+      this.evaluacionesDisponibles = this.evaluationService.getEvaluaciones().filter(
+        (e: EvaluationModel) => (e.preguntas || []).length > 0
+      );
+
+      this.evaluacionBloqueada = false;
+    });
   }
-yaPresentoEvaluacion(evaluacion: any): boolean {
-  const historial = JSON.parse(localStorage.getItem('resultados') || '[]');
 
-  const identificacion =
-    this.estudiante?.identificacion ||
-    this.estudiante?.data?.identificacion ||
-    '';
+  private normalizar(valor: any): string {
+    const texto = String(valor ?? '').trim().toUpperCase();
+    if (['V', 'VERDADERO', 'SI', 'SÍ', 'TRUE'].includes(texto)) return 'V';
+    if (['F', 'FALSO', 'NO', 'FALSE'].includes(texto)) return 'F';
+    return texto;
+  }
 
-  return historial.some((r: any) =>
-    r.identificacion === identificacion &&
-    r.evaluacion === evaluacion.nombre
-  );
-}
+  private obtenerNotaMaxima(escala: string): number {
+    const partes = String(escala || '').split('-');
+    if (partes.length > 1) {
+      const maxima = Number(partes[1].trim());
+      if (Number.isFinite(maxima) && maxima > 0) return maxima;
+    }
+    return 5;
+  }
+
+  private guardarEnHistorial(resultado: any): void {
+    try {
+      const historial = JSON.parse(localStorage.getItem('resultados') || '[]');
+      const lista = Array.isArray(historial) ? historial : [];
+      lista.push(resultado);
+      localStorage.setItem('resultados', JSON.stringify(lista));
+    } catch {
+      localStorage.setItem('resultados', JSON.stringify([resultado]));
+    }
+  }
+
+  private async guardarNotaEnAPI(nota: number, estadoResultado: string): Promise<void> {
+    const id = this.estudiante?.data?.id ?? this.estudiante?.id;
+    if (!id) return;
+
+    try {
+      await this.studentService.guardarResultado(Number(id), nota, estadoResultado);
+    } catch (error) {
+      console.warn('No se pudo guardar la nota en la API; queda en el historial local', error);
+    }
+  }
+
+  yaPresentoEvaluacion(evaluacion: EvaluationModel): boolean {
+    let historial: any[] = [];
+    try {
+      historial = JSON.parse(localStorage.getItem('resultados') || '[]');
+    } catch {
+      historial = [];
+    }
+
+    const identificacion = this.estudiante?.data?.identificacion || '';
+    return historial.some(r =>
+      r.identificacion === identificacion && r.evaluacion === evaluacion.nombre
+    );
+  }
+
   volverASeleccionar(): void {
+    this.detenerTemporizador();
+
     this.evaluacion = null;
     this.respuestas = [];
+    this.preguntaActual = 0;
+    this.tiempoRestante.set(null);
+    this.evaluacionBloqueada = false;
+
     localStorage.removeItem('evaluacionActiva');
+  }
+
+  confirmarAbandonarExamen(): void {
+    Swal.fire({
+      title: 'Abandonar examen',
+      text: 'Si abandonas el examen, se perderán las respuestas no enviadas.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, abandonar',
+      cancelButtonText: 'Continuar examen'
+    }).then(res => {
+      if (!res.isConfirmed) return;
+      this.volverASeleccionar();
+    });
+  }
+
+  confirmarCerrarSesion(): void {
+    Swal.fire({
+      title: 'Cerrar sesión',
+      text: '¿Deseas cerrar tu sesión?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cerrar sesión',
+      cancelButtonText: 'Cancelar'
+    }).then(res => {
+      if (!res.isConfirmed) return;
+      this.cerrarSesion();
+    });
   }
 
   cerrarSesion(): void {
-    localStorage.removeItem('usuarioActivo');
-    localStorage.removeItem('evaluacionActiva');
-    this.router.navigate(['/']);
+    this.detenerTemporizador();
+    this.authService.cerrarSesion();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Sesión cerrada',
+      timer: 1200,
+      showConfirmButton: false
+    }).then(() => {
+      void this.router.navigate(['/']);
+    });
   }
 }

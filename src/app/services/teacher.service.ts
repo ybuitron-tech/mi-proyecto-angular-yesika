@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { RespuestaLogin } from './auth.service';
 import { TeacherModel } from '../models/teacher';
 
 @Injectable({
@@ -55,9 +56,9 @@ export class TeacherService {
     await this.cargar();
   }
 
-  async login(identificacion: string, password: string): Promise<TeacherModel> {
+  async login(identificacion: string, password: string): Promise<RespuestaLogin<TeacherModel>> {
     return firstValueFrom(
-      this.http.post<TeacherModel>(`${this.apiUrl}/login`, { identificacion, password })
+      this.http.post<RespuestaLogin<TeacherModel>>(`${this.apiUrl}/login`, { identificacion, password })
     );
   }
 

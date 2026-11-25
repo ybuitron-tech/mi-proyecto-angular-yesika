@@ -52,8 +52,9 @@
       <div class="tarjeta-formulario">
         <div class="grid-formulario">
           <div class="grupo-campo">
-            <label class="etiqueta">Nombre de escala</label>
+            <label class="etiqueta" for="escala_nombre">Nombre de escala</label>
             <input
+              id="escala_nombre"
               class="entrada"
               type="text"
               [(ngModel)]="nuevaEscala.nombre"
@@ -62,8 +63,9 @@
           </div>
 
           <div class="grupo-campo">
-            <label class="etiqueta">Nota mínima</label>
+            <label class="etiqueta" for="escala_min">Nota mínima</label>
             <input
+              id="escala_min"
               class="entrada"
               type="number"
               [(ngModel)]="nuevaEscala.min"
@@ -71,8 +73,9 @@
           </div>
 
           <div class="grupo-campo">
-            <label class="etiqueta">Nota máxima</label>
+            <label class="etiqueta" for="escala_max">Nota máxima</label>
             <input
+              id="escala_max"
               class="entrada"
               type="number"
               [(ngModel)]="nuevaEscala.max"

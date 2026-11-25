@@ -5,6 +5,7 @@ import { RouterModule, Router } from '@angular/router';
 import Swal from 'sweetalert2';
 
 import { TeacherService } from '../../services/teacher.service';
+import { AuthService } from '../../services/auth.service';
 import { TeacherModel } from '../../models/teacher';
 
 @Component({
@@ -33,7 +34,8 @@ export class Teacher implements OnInit {
 
   constructor(
     private router: Router,
-    private teacherService: TeacherService
+    private teacherService: TeacherService,
+    private authService: AuthService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -188,6 +190,7 @@ export class Teacher implements OnInit {
     }).then(res => {
       if (!res.isConfirmed) return;
 
+      this.authService.cerrarSesion();
       this.mostrarExito('Sesión cerrada').then(() => {
         this.router.navigate(['/']);
       });

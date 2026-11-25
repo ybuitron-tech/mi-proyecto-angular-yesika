@@ -167,12 +167,12 @@
 }
 
 .guardar {
-  background: #2ecc71;
+  background: #187c43;
   color: white;
 }
 
 .guardar:hover {
-  background: #27ae60;
+  background: #146c39;
   transform: scale(1.02);
 }
 

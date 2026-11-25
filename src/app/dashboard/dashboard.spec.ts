@@ -4,7 +4,7 @@ describe('DashboardComponent', () => {
   let component: DashboardComponent;
 
   beforeEach(async () => {
-    component = new DashboardComponent();
+    component = new DashboardComponent({ cargar: async () => [] } as any);
   });
 
   it('should create', () => {

@@ -9,17 +9,17 @@ import { Results } from './pages/results/results';
 import { Scale } from './pages/scale/scale';
 import { Exam } from './pages/exam/exam';
 import { DashboardComponent } from './dashboard/dashboard.component';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-
-   { path: '', component: Login },
-   { path: 'registro', component: Register },
-   { path: 'estudiantes', component: Student },
-   { path: 'docentes', component:Teacher},
-   { path: 'evaluaciones', component:Evaluations},
-   { path: 'preguntas', component: Questions},
-   { path: 'resultados', component:Results},
-   { path: 'escalas', component:Scale},
-   { path: 'examen', component: Exam },
-   { path: 'dashboard', component: DashboardComponent }
-]
+  { path: '', component: Login },
+  { path: 'registro', component: Register },
+  { path: 'estudiantes', component: Student, canActivate: [authGuard] },
+  { path: 'docentes', component: Teacher, canActivate: [authGuard] },
+  { path: 'evaluaciones', component: Evaluations, canActivate: [authGuard] },
+  { path: 'preguntas', component: Questions, canActivate: [authGuard] },
+  { path: 'resultados', component: Results, canActivate: [authGuard] },
+  { path: 'escalas', component: Scale, canActivate: [authGuard] },
+  { path: 'examen', component: Exam, canActivate: [authGuard] },
+  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] }
+];

@@ -5,6 +5,7 @@ import { Router, RouterModule } from '@angular/router';
 import Swal from 'sweetalert2';
 
 import { StudentService } from '../../services/student.service';
+import { AuthService } from '../../services/auth.service';
 import { StudentModel } from '../../models/student';
 
 @Component({
@@ -35,7 +36,8 @@ export class Student implements OnInit {
 
   constructor(
     private router: Router,
-    private studentService: StudentService
+    private studentService: StudentService,
+    private authService: AuthService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -181,7 +183,7 @@ export class Student implements OnInit {
     }).then((res) => {
       if (!res.isConfirmed) return;
 
-      localStorage.removeItem('usuarioActivo');
+      this.authService.cerrarSesion();
 
       Swal.fire({
         icon: 'success',

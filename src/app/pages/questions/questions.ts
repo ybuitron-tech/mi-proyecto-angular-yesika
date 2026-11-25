@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import Swal from 'sweetalert2';
 
 import { EvaluationService } from '../../services/evaluations.service';
+import { AuthService } from '../../services/auth.service';
 import { EvaluationModel } from '../../models/evaluation';
 import { QuestionModel } from '../../models/question';
 
@@ -25,22 +26,30 @@ export class Questions implements OnInit {
     opcionB: '',
     opcionC: '',
     opcionD: '',
-    respuesta: ''
+    respuesta: '',
+
+    
+    tiempo: null
   };
 
   listaPreguntas: QuestionModel[] = [];
   editandoIndex: number = -1;
 
+
+  usarTiempoPregunta: boolean = false;
+
   constructor(
     private router: Router,
-    private evaluationService: EvaluationService
+    private evaluationService: EvaluationService,
+    private cd: ChangeDetectorRef,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
     this.cargarEvaluacion();
   }
 
-  cargarEvaluacion() {
+  cargarEvaluacion(): void {
     const data = this.evaluationService.getEvaluacion();
 
     if (!data) {
@@ -55,22 +64,55 @@ export class Questions implements OnInit {
     }
 
     this.evaluacion = data;
-    this.listaPreguntas = data.preguntas || [];
+
+   
+    this.listaPreguntas = [...(data.preguntas || [])].map((p: any) => ({
+      enunciado: p.enunciado || '',
+      opcionA: p.opcionA || '',
+      opcionB: p.opcionB || '',
+      opcionC: p.opcionC || '',
+      opcionD: p.opcionD || '',
+      respuesta: p.respuesta || '',
+      tiempo:
+        p.tiempo == null || p.tiempo === ''
+          ? null
+          : Number(p.tiempo)
+    }));
+
+    this.cd.detectChanges();
   }
 
-  get totalPreguntas() {
+  get totalPreguntas(): number {
     return this.evaluacion?.cantidad || 0;
   }
 
-  guardarPregunta() {
+  get preguntasCompletas(): boolean {
+    return this.listaPreguntas.length === this.totalPreguntas;
+  }
 
+  cambiarUsoTiempo(activo: boolean): void {
+
+    // Si el docente activa el tiempo, aparece el campo vacío.
+    // Si lo desactiva, la pregunta queda sin límite de tiempo.
+    this.usarTiempoPregunta = activo;
+
+    if (!activo) {
+      this.pregunta.tiempo = null;
+    }
+  }
+
+  guardarPregunta(): void {
     const errores = this.validarFormulario();
 
     if (errores.length) {
       Swal.fire({
         icon: 'error',
-        title: 'Formulario incompleto',
-        text: errores.join(', ')
+        title: 'Revise el formulario',
+        html: `
+          <ul style="text-align:left">
+            ${errores.map(error => `<li>${error}</li>`).join('')}
+          </ul>
+        `
       });
       return;
     }
@@ -79,83 +121,174 @@ export class Questions implements OnInit {
       Swal.fire({
         icon: 'warning',
         title: 'Límite alcanzado',
-        text: 'Ya completaste todas las preguntas'
+        text: 'Ya completaste todas las preguntas configuradas para esta evaluación'
       });
       return;
     }
 
     if (this.editandoIndex >= 0) {
       this.listaPreguntas[this.editandoIndex] = { ...this.pregunta };
-      this.editandoIndex = -1;
-
-      this.mostrarExito('Pregunta actualizada');
-
+      this.mostrarExito('Pregunta actualizada correctamente');
     } else {
       this.listaPreguntas.push({ ...this.pregunta });
-      this.mostrarExito('Pregunta guardada');
+      this.mostrarExito('Pregunta guardada correctamente');
     }
+
+    
+    this.listaPreguntas = [...this.listaPreguntas];
 
     this.guardarEnStorage();
     this.limpiarFormulario();
+
+    this.cd.detectChanges();
   }
 
   validarFormulario(): string[] {
-
     const p = this.pregunta;
     const tipo = this.evaluacion.tipo;
 
+    // Limpia espacios antes de validar y guardar.
+    p.enunciado = p.enunciado.trim();
+    p.opcionA = (p.opcionA || '').trim();
+    p.opcionB = (p.opcionB || '').trim();
+    p.opcionC = (p.opcionC || '').trim();
+    p.opcionD = (p.opcionD || '').trim();
+    p.respuesta = p.respuesta.trim().toUpperCase();
+
+
+    const tiempo = Number(p.tiempo);
+    const tiempoVacio = p.tiempo === null;
+
     const reglas = [
-      () => !p.enunciado.trim() && 'Ingrese la pregunta',
+      () => !p.enunciado && 'Ingrese la pregunta',
 
-      () => tipo === 'multiple' &&
-        (!p.opcionA || !p.opcionB || !p.opcionC || !p.opcionD) &&
-        'Complete todas las opciones',
+      () =>
+        this.usarTiempoPregunta &&
+        tiempoVacio &&
+        'Ingrese el tiempo de la pregunta',
 
-      () => tipo === 'multiple' &&
-        !['A', 'B', 'C', 'D'].includes(p.respuesta.toUpperCase()) &&
-        'Respuesta debe ser A, B, C o D',
+      () =>
+        this.usarTiempoPregunta &&
+        (!tiempo || tiempo <= 0) &&
+        'Ingrese un tiempo válido para la pregunta',
 
-      () => tipo === 'vf' &&
-        !['V', 'F'].includes(p.respuesta.toUpperCase()) &&
-        'Seleccione Verdadero o Falso',
+      () =>
+        this.usarTiempoPregunta &&
+        tiempo > 300 &&
+        'El tiempo máximo permitido por pregunta es de 300 segundos',
 
-      () => tipo === 'abierta' &&
-        !p.respuesta.trim() &&
-        'Ingrese la respuesta'
+      () => {
+        if (tipo !== 'multiple') return null;
+
+        if (!p.opcionA || !p.opcionB || !p.opcionC || !p.opcionD) {
+          return 'Complete todas las opciones';
+        }
+
+        if (!['A', 'B', 'C', 'D'].includes(p.respuesta)) {
+          return 'La respuesta debe ser A, B, C o D';
+        }
+
+        return null;
+      },
+
+      () => {
+        if (tipo !== 'vf') return null;
+
+        if (!['V', 'F'].includes(p.respuesta)) {
+          return 'Seleccione Verdadero o Falso';
+        }
+
+        return null;
+      },
+
+      () => {
+        if (tipo !== 'abierta') return null;
+
+        if (!p.respuesta) {
+          return 'Ingrese la respuesta';
+        }
+
+        return null;
+      }
     ];
 
-    return reglas
-      .map(r => r())
-      .filter(m => m) as string[];
+    const errores = reglas
+      .map(regla => regla())
+      .filter(mensaje => mensaje) as string[];
+
+  
+    if (errores.length === 0) {
+      p.tiempo = this.usarTiempoPregunta ? tiempo : null;
+    }
+
+    return errores;
   }
 
-  guardarEnStorage() {
-    this.evaluacion.preguntas = this.listaPreguntas;
+  guardarEnStorage(): void {
+    this.evaluacion.preguntas = [...this.listaPreguntas];
     this.evaluationService.guardarEvaluacion(this.evaluacion);
   }
 
-  limpiarFormulario() {
+  limpiarFormulario(): void {
     this.pregunta = {
       enunciado: '',
       opcionA: '',
       opcionB: '',
       opcionC: '',
       opcionD: '',
-      respuesta: ''
+      respuesta: '',
+
+
+      tiempo: null
     };
+
+    this.usarTiempoPregunta = false;
+    this.editandoIndex = -1;
   }
 
-  editarPregunta(index: number) {
-    this.pregunta = { ...this.listaPreguntas[index] };
+  editarPregunta(index: number): void {
+    const preguntaSeleccionada = this.listaPreguntas[index];
+
+    this.pregunta = {
+      ...preguntaSeleccionada,
+      tiempo:
+        preguntaSeleccionada.tiempo === null
+          ? null
+          : Number(preguntaSeleccionada.tiempo)
+    };
+
+    
+    this.usarTiempoPregunta = this.pregunta.tiempo !== null;
+
     this.editandoIndex = index;
   }
 
-  eliminarPregunta(index: number) {
-    this.listaPreguntas.splice(index, 1);
-    this.guardarEnStorage();
+  eliminarPregunta(index: number): void {
+    Swal.fire({
+      title: '¿Eliminar pregunta?',
+      text: 'Esta acción no se puede deshacer',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then(res => {
+      if (!res.isConfirmed) return;
+
+      this.listaPreguntas = this.listaPreguntas.filter((_, i) => i !== index);
+
+      this.guardarEnStorage();
+
+      if (this.editandoIndex === index) {
+        this.limpiarFormulario();
+      }
+
+      this.cd.detectChanges();
+
+      this.mostrarExito('Pregunta eliminada correctamente');
+    });
   }
 
-  verPregunta(index: number) {
+  verPregunta(index: number): void {
     const p = this.listaPreguntas[index];
 
     let contenido = `<strong>${p.enunciado}</strong><br><br>`;
@@ -169,7 +302,10 @@ export class Questions implements OnInit {
       `;
     }
 
-    contenido += `<b>Respuesta:</b> ${p.respuesta}`;
+    contenido += `
+      <b>Respuesta:</b> ${p.respuesta}<br>
+      <b>Tiempo:</b> ${p.tiempo === null ? 'Sin límite' : p.tiempo + ' segundos'}
+    `;
 
     Swal.fire({
       title: 'Detalle de la pregunta',
@@ -178,16 +314,68 @@ export class Questions implements OnInit {
     });
   }
 
-  cancelarEdicion() {
-    this.editandoIndex = -1;
+  async finalizarEvaluacion(): Promise<void> {
+    if (this.listaPreguntas.length < this.totalPreguntas) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Faltan preguntas',
+        text: `Debes registrar ${this.totalPreguntas} preguntas. Actualmente tienes ${this.listaPreguntas.length}.`
+      });
+      return;
+    }
+
+    try {
+      await this.evaluationService.asignarPreguntas(this.listaPreguntas);
+      this.guardarEnStorage();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Evaluación creada correctamente',
+        text: 'La evaluación quedó lista para que los estudiantes puedan presentarla.',
+        confirmButtonText: 'Aceptar'
+      }).then(() => {
+        localStorage.removeItem('evaluacionActiva');
+        this.router.navigate(['/evaluaciones']);
+      });
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'No se pudo guardar la evaluación',
+        text: error?.error?.message || 'Verifica la conexión con el backend.'
+      });
+      console.error(error);
+    }
+  }
+
+  cancelarEdicion(): void {
     this.limpiarFormulario();
   }
 
-  cerrarSesion() {
-    this.router.navigate(['/']);
+  cerrarSesion(): void {
+    Swal.fire({
+      title: 'Cerrar sesión',
+      text: '¿Desea salir del sistema?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Salir',
+      cancelButtonText: 'Cancelar'
+    }).then(res => {
+      if (!res.isConfirmed) return;
+
+      this.authService.cerrarSesion();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Sesión cerrada',
+        timer: 1200,
+        showConfirmButton: false
+      }).then(() => {
+        this.router.navigate(['/']);
+      });
+    });
   }
 
-  mostrarExito(mensaje: string) {
+  mostrarExito(mensaje: string): void {
     Swal.fire({
       icon: 'success',
       title: mensaje,

@@ -35,6 +35,11 @@ Si usas Netlify/Vercel:
 4. En `/estudiantes` y `/docentes`, crear/editar/eliminar: los datos deben persistir tras recargar (F5).
 
 ## 5. Estado de la integración
-- ✅ Conectados al backend: login, registro, estudiantes y docentes (CRUD).
-- ⏳ Siguen en `localStorage`/JSON: evaluaciones, preguntas, escalas, resultados y examen.
-  El backend ya expone `/api/v1/escalas` y `/api/v1/evaluaciones`, pero el frontend aún no los consume.
+- ✅ Conectados al backend: login (JWT), registro, estudiantes, docentes, escalas,
+  evaluaciones, preguntas, examen y resultados.
+- ✅ El token JWT se envía automáticamente en todas las peticiones y las rutas internas
+  están protegidas por un guard.
+- 🔄 El detalle del examen se conserva en `localStorage` como historial, pero la nota
+  se persiste en la base de datos mediante `PATCH /api/v1/estudiantes/:id/resultado`.
+- ⚠️ Antes de desplegar, reemplaza el placeholder de `apiUrl` en
+  `src/environments/environment.prod.ts` por la URL pública real del backend.

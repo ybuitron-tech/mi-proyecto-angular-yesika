@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { RespuestaLogin } from './auth.service';
 import { StudentModel } from '../models/student';
 
 @Injectable({
@@ -51,13 +52,21 @@ export class StudentService {
     await this.cargar();
   }
 
-  async login(identificacion: string, password: string): Promise<StudentModel> {
+  async login(identificacion: string, password: string): Promise<RespuestaLogin<StudentModel>> {
     return firstValueFrom(
-      this.http.post<StudentModel>(`${this.apiUrl}/login`, { identificacion, password })
+      this.http.post<RespuestaLogin<StudentModel>>(`${this.apiUrl}/login`, { identificacion, password })
     );
   }
 
-  // El backend no acepta nota/estadoResultado (son solo de la UI).
+  /** Guarda la nota/estado del estudiante en la base de datos. */
+  async guardarResultado(id: number, nota: number, estadoResultado: string): Promise<StudentModel> {
+    const actualizado = await firstValueFrom(
+      this.http.patch<StudentModel>(`${this.apiUrl}/${id}/resultado`, { nota, estadoResultado })
+    );
+    await this.cargar();
+    return actualizado;
+  }
+
   private limpiar(estudiante: StudentModel) {
     const payload: any = {
       nombre: estudiante.nombre,

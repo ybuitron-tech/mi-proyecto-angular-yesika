@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+
+import { StudentService } from '../services/student.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -8,24 +10,38 @@ import { CommonModule } from '@angular/common';
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
 
   mostrar = false;
+  estudiantes: { nombre: string; nota: number }[] = [];
 
-  estudiantes = [
-    { nombre: 'Juan', nota: 4.8 },
-    { nombre: 'María', nota: 3.2 },
-    { nombre: 'Carlos', nota: 2.5 },
-    { nombre: 'Ana', nota: 4.0 }
-  ];
+  constructor(private studentService: StudentService) {}
+
+  async ngOnInit(): Promise<void> {
+    await this.cargarEstudiantes();
+  }
+
+  async cargarEstudiantes(): Promise<void> {
+    try {
+      const lista = await this.studentService.cargar();
+      this.estudiantes = lista.map(est => ({
+        nombre: `${est.nombre} ${est.apellido}`.trim(),
+        nota: Number(est.nota ?? 0)
+      }));
+    } catch (error) {
+      console.warn('No se pudo cargar el dashboard desde la API', error);
+      this.estudiantes = [];
+    }
+  }
 
   toggleDashboard() {
     this.mostrar = !this.mostrar;
   }
 
   getPromedio() {
+    if (!this.estudiantes.length) return 0;
     const suma = this.estudiantes.reduce((acc, e) => acc + e.nota, 0);
-    return this.estudiantes.length ? suma / this.estudiantes.length : 0;
+    return suma / this.estudiantes.length;
   }
 
   getAprobados() {
@@ -33,7 +49,7 @@ export class DashboardComponent {
   }
 
   getEnRiesgo() {
-    return this.estudiantes.filter(e => e.nota < 3).length;
+    return this.estudiantes.filter(e => e.nota > 0 && e.nota < 3).length;
   }
 
   analisisIA() {

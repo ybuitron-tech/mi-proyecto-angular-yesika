@@ -45,17 +45,42 @@
     <main class="area-contenido">
 
       <div class="tarjeta-info-evaluacion" *ngIf="evaluacion">
-        <h3>{{ evaluacion.nombre }}</h3>
+        <h3>Evaluación creada: {{ evaluacion.nombre }}</h3>
+        <p>Ahora registra las preguntas correspondientes a esta evaluación.</p>
         <p><strong>Docente:</strong> {{ evaluacion.docente }}</p>
         <p><strong>Tipo:</strong> {{ evaluacion.tipo }}</p>
-        <p><strong>Preguntas:</strong> {{ listaPreguntas.length }} / {{ totalPreguntas }}</p>
+        <p><strong>Preguntas registradas:</strong> {{ listaPreguntas.length }} / {{ totalPreguntas }}</p>
+
+        <div *ngIf="preguntasCompletas" class="mensaje-completo">
+          Ya completaste todas las preguntas. Puedes Guardar la evaluación.
+        </div>
       </div>
 
       <div class="tarjeta-formulario">
 
-        <input [(ngModel)]="pregunta.enunciado" placeholder="Pregunta" class="entrada">
+        <input
+          [(ngModel)]="pregunta.enunciado"
+          placeholder="Pregunta"
+          class="entrada">
 
-        <div *ngIf="evaluacion.tipo === 'multiple'">
+        <label class="opcion-tiempo">
+          <input
+            type="checkbox"
+            [checked]="usarTiempoPregunta"
+            (change)="cambiarUsoTiempo($any($event.target).checked)">
+          Activar tiempo para esta pregunta
+        </label>
+
+        <input
+          *ngIf="usarTiempoPregunta"
+          type="number"
+          min="1"
+          max="300"
+          [(ngModel)]="pregunta.tiempo"
+          placeholder="Tiempo de la pregunta en segundos"
+          class="entrada">
+
+        <div *ngIf="evaluacion && evaluacion.tipo === 'multiple'">
           <input [(ngModel)]="pregunta.opcionA" placeholder="Opción A" class="entrada">
           <input [(ngModel)]="pregunta.opcionB" placeholder="Opción B" class="entrada">
           <input [(ngModel)]="pregunta.opcionC" placeholder="Opción C" class="entrada">
@@ -63,7 +88,7 @@
           <input [(ngModel)]="pregunta.respuesta" placeholder="Respuesta (A-D)" class="entrada">
         </div>
 
-        <div *ngIf="evaluacion.tipo === 'vf'">
+        <div *ngIf="evaluacion && evaluacion.tipo === 'vf'">
           <select [(ngModel)]="pregunta.respuesta" class="entrada">
             <option value="">Seleccione</option>
             <option value="V">Verdadero</option>
@@ -71,12 +96,24 @@
           </select>
         </div>
 
-        <div *ngIf="evaluacion.tipo === 'abierta'">
+        <div *ngIf="evaluacion && evaluacion.tipo === 'abierta'">
           <input [(ngModel)]="pregunta.respuesta" placeholder="Respuesta" class="entrada">
         </div>
 
-        <button class="boton guardar" (click)="guardarPregunta()">Guardar</button>
+        <button
+          class="boton guardar"
+          type="button"
+          (click)="guardarPregunta()"
+          [disabled]="preguntasCompletas && editandoIndex === -1">
+          {{ editandoIndex >= 0 ? 'Actualizar pregunta' : 'Guardar pregunta' }}
+        </button>
 
+      </div>
+
+      <div class="acciones-finalizar" *ngIf="preguntasCompletas">
+        <button class="boton finalizar" type="button" (click)="finalizarEvaluacion()">
+          Guardar evaluación
+        </button>
       </div>
 
       <div class="tarjeta-lista" *ngIf="listaPreguntas.length > 0">
@@ -95,6 +132,7 @@
               </ng-container>
 
               <th>Respuesta</th>
+              <th>Tiempo</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -111,7 +149,15 @@
                 <td>{{ p.opcionD }}</td>
               </ng-container>
 
-              <td>{{ p.respuesta }}</td>
+              <td>
+                <span class="badge-respuesta">
+                  {{ p.respuesta }}
+                </span>
+              </td>
+
+              <td>
+                {{ p.tiempo === null ? 'Sin límite' : p.tiempo + ' segundos' }}
+              </td>
 
               <td class="acciones">
                 <i class="fas fa-eye" (click)="verPregunta(i)" title="Ver"></i>
@@ -122,6 +168,11 @@
           </tbody>
         </table>
 
+      </div>
+
+      <div class="mensaje-vacio" *ngIf="listaPreguntas.length === 0">
+        <i class="fas fa-question-circle"></i>
+        <p>Aún no hay preguntas registradas para esta evaluación.</p>
       </div>
 
     </main>

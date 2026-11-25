@@ -54,13 +54,13 @@
       <div class="tarjeta-formulario">
 
         <div class="grupo-campo">
-          <label class="etiqueta">Nombre de Evaluación</label>
-          <input type="text" class="entrada" [(ngModel)]="evaluacion.nombre">
+          <label class="etiqueta" for="evaluacion_nombre">Nombre de Evaluación</label>
+          <input id="evaluacion_nombre" type="text" class="entrada" [(ngModel)]="evaluacion.nombre">
         </div>
 
         <div class="grupo-campo">
-          <label class="etiqueta">Tipo de Preguntas</label>
-          <select class="select-estado" [(ngModel)]="evaluacion.tipo">
+          <label class="etiqueta" for="evaluacion_tipo">Tipo de Preguntas</label>
+          <select id="evaluacion_tipo" class="select-estado" [(ngModel)]="evaluacion.tipo">
             <option value="multiple">Selección múltiple</option>
             <option value="vf">Verdadero / Falso</option>
             <option value="abierta">Abierta</option>
@@ -68,13 +68,13 @@
         </div>
 
         <div class="grupo-campo">
-          <label class="etiqueta">Cantidad de Preguntas</label>
-          <input type="number" class="entrada" [(ngModel)]="evaluacion.cantidad">
+          <label class="etiqueta" for="evaluacion_cantidad">Cantidad de Preguntas</label>
+          <input id="evaluacion_cantidad" type="number" class="entrada" [(ngModel)]="evaluacion.cantidad">
         </div>
 
         <div class="grupo-campo">
-          <label class="etiqueta">Escala</label>
-          <select class="select-estado" [(ngModel)]="evaluacion.escala">
+          <label class="etiqueta" for="evaluacion_escala">Escala</label>
+          <select id="evaluacion_escala" class="select-estado" [ngModel]="evaluacion.escala" (ngModelChange)="seleccionarEscala($event)">
             <option value="">Seleccione escala</option>
             <option *ngFor="let escala of escalas" [value]="escala.nombre">
               {{ escala.nombre }}
@@ -83,8 +83,8 @@
         </div>
 
         <div class="grupo-campo">
-          <label class="etiqueta">Docente</label>
-          <select class="select-estado" [(ngModel)]="evaluacion.docente">
+          <label class="etiqueta" for="evaluacion_docente">Docente</label>
+          <select id="evaluacion_docente" class="select-estado" [ngModel]="evaluacion.docente" (ngModelChange)="seleccionarDocente($event)">
             <option value="">Seleccione docente</option>
             <option *ngFor="let d of docentes" [value]="d.nombre">
               {{ d.nombre }}

@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 
 import { StudentService } from '../../services/student.service';
 import { TeacherService } from '../../services/teacher.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -18,13 +19,14 @@ export class Login {
 
   identificacion: string = '';
   password: string = '';
-  rol: string = '';
+  rol: string = 'estudiante';
   cargando = false;
 
   constructor(
     private router: Router,
     private studentService: StudentService,
-    private teacherService: TeacherService
+    private teacherService: TeacherService,
+    private authService: AuthService
   ) {}
 
   async iniciarSesion(): Promise<void> {
@@ -41,24 +43,26 @@ export class Login {
 
     try {
       if (this.rol === 'docente') {
-        const docente = await this.teacherService.login(this.identificacion, this.password);
+        const respuesta = await this.teacherService.login(this.identificacion, this.password);
 
-        localStorage.setItem('usuarioActivo', JSON.stringify({
+        this.authService.guardarToken(respuesta.access_token);
+        this.authService.guardarSesion({
           tipo: 'docente',
-          data: docente
-        }));
+          data: respuesta.docente
+        });
 
         await this.router.navigate(['/docentes']);
         return;
       }
 
       if (this.rol === 'estudiante') {
-        const estudiante = await this.studentService.login(this.identificacion, this.password);
+        const respuesta = await this.studentService.login(this.identificacion, this.password);
 
-        localStorage.setItem('usuarioActivo', JSON.stringify({
+        this.authService.guardarToken(respuesta.access_token);
+        this.authService.guardarSesion({
           tipo: 'estudiante',
-          data: estudiante
-        }));
+          data: respuesta.estudiante
+        });
 
         await this.router.navigate(['/examen']);
         return;
